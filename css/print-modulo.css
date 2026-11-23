@@ -1,0 +1,195 @@
+/* === Stile ufficiale MOD.31426- (Modulo 1 / Modulo 2 / Modulo 3) === */
+.modulo-sheet {
+  position: relative;
+  width: 202mm;
+  height: 286.5mm;
+  background: #ffffff;
+  color: #000000;
+  padding: 0;
+  margin: 0 auto;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.mod-logo {
+  position: absolute;
+  top: 0.2mm;
+  left: 0.5mm;
+  width: 8.2mm;
+  height: 8.4mm;
+  object-fit: contain;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.mod-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: #000000;
+}
+
+.mod-grid td {
+  padding: 0 0.5px;
+  overflow: hidden;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.04;
+}
+
+/* Altezze righe scalate fedelmente all'87.5% da Excel Modulo 1 (totale ~286mm) */
+.mod-r1  { height: 4.86mm; }
+.mod-r2  { height: 4.17mm; }
+.mod-r3  { height: 5.32mm; }
+.mod-r4  { height: 2.08mm; }
+.mod-r5  { height: 4.86mm; }
+.mod-r6  { height: 3.94mm; }
+.mod-r7  { height: 3.01mm; }
+.mod-r8  { height: 5.79mm; }
+.mod-r9  { height: 3.01mm; }
+.mod-r10 { height: 3.01mm; }
+.mod-r11 { height: 3.24mm; }
+.mod-r12 { height: 3.24mm; }
+.mod-r-mid { height: 3.93mm; }
+.mod-r29 { height: 2.55mm; }
+.mod-r30 { height: 4.40mm; }
+.mod-r31 { height: 4.63mm; }
+.mod-r32 { height: 1.39mm; }
+.mod-r33 { height: 2.78mm; }
+.mod-r34 { height: 3.70mm; }
+.mod-r35 { height: 4.17mm; }
+.mod-r-diaria { height: 4.34mm; }
+.mod-r69 { height: 4.40mm; }
+.mod-r70 { height: 4.60mm; }
+
+/* Tipografia fedele al foglio Excel */
+.m-title { font-size: 10.5pt; font-weight: 700; text-align: center; }
+.m-foglio-lbl { font-size: 5.5pt; text-align: right; }
+.m-foglio-val { font-size: 5.5pt; text-align: center; }
+.m-hdr-lbl { font-size: 7.5pt; vertical-align: middle; }
+.m-hdr-num { font-size: 12pt; font-weight: 700; text-align: center; }
+.m-hdr-nom { font-size: 8.8pt; text-align: center; }
+.m-hdr-matr { font-size: 12pt; font-weight: 700; text-align: left; }
+
+.m-trasf-title {
+  font-size: 8pt;
+  font-weight: 700;
+  text-align: left;
+  padding-left: 7mm !important;
+  vertical-align: bottom !important;
+}
+.m-trasf-sub { font-size: 7pt; text-align: center; }
+.m-trasf-micro { font-family: 'Arial Narrow', Arial, sans-serif; font-size: 4.1pt; text-align: center; padding: 0 !important; }
+.m-trasf-val { font-size: 8.8pt; text-align: center; font-variant-numeric: tabular-nums; }
+
+.m-sec-title { font-size: 5.6pt; font-weight: 700; text-align: center; }
+.m-sec-title-7 { font-size: 6.2pt; font-weight: 700; text-align: center; }
+.m-th-5 { font-family: 'Arial Narrow', Arial, sans-serif; font-size: 4.3pt; text-align: center; white-space: normal !important; padding: 0 !important; }
+.m-th-6 { font-family: 'Arial Narrow', Arial, sans-serif; font-size: 4.9pt; text-align: center; padding: 0 !important; }
+.m-th-7 { font-size: 6.1pt; text-align: center; }
+.m-th-8 { font-size: 7pt; text-align: center; }
+
+.m-td-ticket { font-size: 7.5pt; text-align: center; font-variant-numeric: tabular-nums; }
+.m-td-ticket-loc { font-family: 'Arial Narrow', Arial, sans-serif; font-size: 7pt; text-align: left; padding-left: 2px !important; }
+.m-td-ticket-day { font-size: 8pt; text-align: center; font-variant-numeric: tabular-nums; }
+.m-td-curr-6 { font-size: 5.3pt; text-align: center; }
+.m-td-curr-8 { font-size: 7pt; text-align: right; }
+
+.m-td-spesa-dt { font-size: 8pt; text-align: center; font-variant-numeric: tabular-nums; }
+.m-td-spesa-desc { font-family: 'Arial Narrow', Arial, sans-serif; font-size: 7pt; text-align: left; padding-left: 2px !important; }
+.m-td-spesa-curr { font-size: 6pt; text-align: center; }
+.m-td-spesa-imp { font-family: Tahoma, Arial, sans-serif; font-size: 7.5pt; text-align: right; padding-right: 2px !important; font-variant-numeric: tabular-nums; }
+
+.m-td-cambi-paese { font-family: 'Arial Narrow', Arial, sans-serif; font-size: 5.2pt; font-weight: 700; text-align: left; padding-left: 2px !important; }
+.m-td-cambi-val { font-family: 'Arial Narrow', Arial, sans-serif; font-size: 6pt; text-align: right; padding-right: 2px !important; font-variant-numeric: tabular-nums; }
+.m-td-cambi-rate { font-size: 6.4pt; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+
+.m-annot-lbl { font-size: 7.2pt; font-weight: 700; text-align: left; vertical-align: top !important; }
+.m-annot-val { font-size: 7.8pt; text-align: left; vertical-align: top !important; white-space: normal !important; padding-left: 2px !important; }
+
+.m-diaria-hdr { font-size: 7.8pt; font-weight: 700; text-align: center; }
+.m-diaria-dt { font-size: 7.3pt; text-align: right; padding-right: 2px !important; font-variant-numeric: tabular-nums; }
+.m-diaria-curr { font-family: 'Arial Narrow', Arial, sans-serif; font-size: 4.8pt; text-align: right; padding: 0 1px 0 0 !important; }
+.m-diaria-imp { font-family: Tahoma, Arial, sans-serif; font-size: 7.2pt; text-align: right; padding-right: 2px !important; font-variant-numeric: tabular-nums; }
+.m-diaria-cop { font-family: Tahoma, Arial, sans-serif; font-size: 6.2pt; text-align: center; }
+.m-diaria-note {
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  font-size: 4.9pt;
+  text-align: left;
+  white-space: pre-line !important;
+  line-height: 0.96;
+  padding-left: 2px !important;
+}
+
+.m-footer-l { font-size: 7pt; text-align: left; }
+.m-footer-c { font-size: 4.6pt; text-align: center; }
+.m-footer-r { font-size: 7pt; text-align: left; }
+
+/* Bordi precisi (thin = 0.75pt #000, hair = 0.45pt #555) */
+.bt-thin { border-top: 0.75pt solid #000 !important; }
+.bb-thin { border-bottom: 0.75pt solid #000 !important; }
+.bl-thin { border-left: 0.75pt solid #000 !important; }
+.br-thin { border-right: 0.75pt solid #000 !important; }
+.bt-hair { border-top: 0.45pt solid #555 !important; }
+.bb-hair { border-bottom: 0.45pt solid #555 !important; }
+.bl-hair { border-left: 0.45pt solid #555 !important; }
+.br-hair { border-right: 0.45pt solid #555 !important; }
+
+/* === Regole di stampa A4 === */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 4mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .main-content {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Forza visibilità solo del modulo attivo durante stampa */
+  body.printing-modulo #view-editor,
+  body.printing-modulo #view-nota-spese,
+  body.printing-modulo #view-massimali,
+  body.printing-modulo #view-archive {
+    display: none !important;
+  }
+
+  body.printing-modulo #view-modulo {
+    display: block !important;
+  }
+
+  .print-preview-stage {
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .print-preview-stage .modulo-sheet {
+    box-shadow: none !important;
+    transform: none !important;
+    margin: 0 auto !important;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-preview-stage .modulo-sheet:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}
