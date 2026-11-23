@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#00338d">
+  <title>Gestione Trasferte RAI · MOD. 31426</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/print-modulo.css">
+</head>
+<body>
+  <div id="app-shell" class="app-shell">
+    <!-- Top Application Bar (nascosta in stampa) -->
+    <header class="topbar no-print" role="banner">
+      <div class="topbar-inner">
+        <div class="brand">
+          <img id="topbar-logo" class="brand-logo" alt="Logo RAI">
+          <div class="brand-text">
+            <div class="brand-title">Gestione Trasferte</div>
+            <div class="brand-sub">Nota Spese &amp; Distinta MOD. 31426</div>
+          </div>
+        </div>
+
+        <div class="archive-bar" aria-label="Archivio Trasferte">
+          <label for="trip-selector" class="sr-only">Seleziona trasferta</label>
+          <select id="trip-selector" class="archive-select" title="Trasferte salvate nel browser"></select>
+          <button type="button" id="btn-save-as" class="btn btn-sm btn-primary" title="Assegna un nome o salva una copia in archivio">Salva con nome</button>
+          <button type="button" id="btn-new-trip" class="btn btn-sm btn-secondary" title="Crea una nuova trasferta">+ Nuova</button>
+          <button type="button" id="btn-dup-trip" class="btn btn-sm btn-ghost" title="Duplica la trasferta corrente">Duplica</button>
+          <button type="button" id="btn-del-trip" class="btn btn-sm btn-ghost-danger" title="Elimina la trasferta corrente">Elimina</button>
+          <div class="divider-v" aria-hidden="true"></div>
+          <button type="button" id="btn-export-trip" class="btn btn-sm btn-ghost" title="Esporta backup JSON">Esporta JSON</button>
+          <button type="button" id="btn-import-trip" class="btn btn-sm btn-ghost" title="Importa backup JSON">Importa JSON</button>
+          <input type="file" id="input-import-trip" accept=".json,application/json" hidden>
+        </div>
+
+        <div class="topbar-actions">
+          <div id="autosave-status" class="autosave-badge" role="status" aria-live="polite">
+            <span class="autosave-dot" aria-hidden="true"></span>
+            <span id="autosave-text">Salvato in tempo reale</span>
+          </div>
+          <button type="button" id="btn-quick-print" class="btn btn-primary">
+            Stampa Modulo 1
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" role="tablist" aria-label="Sezioni applicazione">
+        <button type="button" class="nav-tab active" role="tab" aria-selected="true" data-tab="editor">
+          1. Compilazione
+        </button>
+        <button type="button" class="nav-tab" role="tab" aria-selected="false" data-tab="nota-spese">
+          2. Nota Spese
+        </button>
+        <button type="button" class="nav-tab" role="tab" aria-selected="false" data-tab="modulo">
+          3. Modulo 1 / Stampa
+        </button>
+        <button type="button" class="nav-tab" role="tab" aria-selected="false" data-tab="massimali">
+          4. Massimali &amp; Codici Paesi
+        </button>
+        <button type="button" class="nav-tab" role="tab" aria-selected="false" data-tab="archive">
+          5. Archivio (<span id="archive-count">1</span>)
+        </button>
+      </nav>
+    </header>
+
+    <!-- Storage Warning Banner (if needed) -->
+    <div id="storage-warning" class="alert-banner no-print" hidden></div>
+
+    <!-- Main Content Views -->
+    <main class="main-content">
+      <section id="view-editor" class="tab-panel active" role="tabpanel"></section>
+      <section id="view-nota-spese" class="tab-panel" role="tabpanel" hidden></section>
+      <section id="view-modulo" class="tab-panel" role="tabpanel" hidden></section>
+      <section id="view-massimali" class="tab-panel" role="tabpanel" hidden></section>
+      <section id="view-archive" class="tab-panel" role="tabpanel" hidden></section>
+    </main>
+
+    <!-- Modale Salva con Nome -->
+    <div id="save-as-modal" class="modal-backdrop no-print" hidden role="dialog" aria-modal="true" aria-labelledby="save-as-title">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="save-as-title" style="margin:0; font-size:16px; color:var(--rai-blue);">Salva Trasferta in Archivio</h3>
+          <button type="button" id="save-as-close" class="btn btn-xs btn-ghost" aria-label="Chiudi">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin:0 0 12px; font-size:12.5px; color:var(--text-muted);">
+            Assegna un nome di riferimento per ritrovare facilmente questa trasferta quando ne compilerai altre. Il nome serve solo per l'archivio e non viene stampato sul Modulo 1.
+          </p>
+          <div class="field" style="margin-bottom:12px;">
+            <label for="save-as-name">Nome / Riferimento Trasferta</label>
+            <input id="save-as-name" class="input" type="text" placeholder="es. Sanremo 2026, Milano Marzo, Londra...">
+          </div>
+          <div class="field">
+            <label for="save-as-status">Stato</label>
+            <select id="save-as-status" class="select">
+              <option value="in_corso">In corso (bozza modificabile)</option>
+              <option value="completata">Completata (pronta / archiviata)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="save-as-cancel" class="btn btn-sm btn-ghost">Annulla</button>
+          <button type="button" id="save-as-json" class="btn btn-sm btn-ghost">Salva &amp; Scarica JSON</button>
+          <button type="button" id="save-as-copy" class="btn btn-sm btn-secondary">Salva come nuova copia</button>
+          <button type="button" id="save-as-current" class="btn btn-sm btn-primary">Salva sulla trasferta corrente</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container no-print" aria-live="polite"></div>
+  </div>
+
+  <!-- Datalist globale per autocompletamento paesi -->
+  <datalist id="countries-datalist"></datalist>
+
+  <script defer src="js/data-defaults.js"></script>
+  <script defer src="js/calc-engine.js"></script>
+  <script defer src="js/storage.js"></script>
+  <script defer src="js/ui-editor.js"></script>
+  <script defer src="js/ui-nota-spese.js"></script>
+  <script defer src="js/ui-modulo-print.js"></script>
+  <script defer src="js/ui-massimali.js"></script>
+  <script defer src="js/ui-archive.js"></script>
+  <script defer src="js/app.js"></script>
+</body>
+</html>
