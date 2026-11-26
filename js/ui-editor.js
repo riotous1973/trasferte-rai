@@ -59,6 +59,14 @@
       };
     }
     if (meal.quota !== null && meal.quota !== undefined) {
+      if (meal.code && meal.code !== 'IT' && meal.currencyLabel) {
+        const isPending = meal.unconvertedValuta > 0;
+        return {
+          text: `${Calc.formatItCurrency(meal.quota)} ${meal.currencyLabel}`,
+          cls: isPending ? 'cell-readonly cell-valuta-pending' : 'cell-readonly',
+          title: isPending ? 'In valuta locale (cambio a cura Uff. Trasferte)' : '',
+        };
+      }
       return { text: Calc.formatItCurrency(meal.quota), cls: 'cell-readonly', title: '' };
     }
     return { text: '—', cls: 'cell-readonly', title: '' };
@@ -224,7 +232,7 @@
         <div class="card-header">
           <div>
             <h2 class="card-title">Paesi Visitati &amp; Cambi Valuta</h2>
-            <div class="card-subtitle">L'Italia (IT) è sempre attiva. Aggiungi eventuali paesi esteri per abilitarli nelle diarie e calcolare i cambi</div>
+            <div class="card-subtitle">L'Italia (IT) è sempre attiva. Se per un paese extra-EUR lasci vuoti Euro Cambiati e Valuta Ottenuta, gli importi restano in valuta locale (cambio a cura Ufficio Trasferte).</div>
           </div>
           <div class="toolbar-inline">
             <input id="add-country-input" class="input" style="width: 260px;" list="countries-datalist" placeholder="Cerca paese o codice (es. GB, FR, USA)...">
@@ -284,9 +292,23 @@
     if (!kpiEl) return;
     const ns = calc.notaSpese;
     const warns = calc.warnings || [];
-    const warnHtml =
+    const infos = calc.infoNotes || [];
+    const subValutaHtml = (map) => {
+      const extras = Calc.formatCurrencyExtras(map);
+      if (!extras) return '';
+      return `<span class="kpi-sub-valuta" title="Importi in valuta locale: cambio a cura Ufficio Trasferte">+ ${escHtml(extras)}</span>`;
+    };
+    const warnBadge =
       warns.length > 0
         ? `<span class="badge badge-amber" title="${escHtml(warns.join('\n'))}">${warns.length} avvis${warns.length === 1 ? 'o' : 'i'}: ${escHtml(warns[0])}</span>`
+        : '';
+    const infoBadge =
+      infos.length > 0
+        ? `<span class="badge badge-blue" title="Gli importi in valuta locale saranno convertiti dall'Ufficio Trasferte">${escHtml(infos[0])}</span>`
+        : '';
+    const statusHtml =
+      warnBadge || infoBadge
+        ? `${warnBadge}${infoBadge}`
         : `<span class="badge badge-green">Dati coerenti</span>`;
 
     kpiEl.innerHTML = `
@@ -298,26 +320,31 @@
         <div class="kpi-item">
           <span class="kpi-label">Totale Diarie</span>
           <span class="kpi-value">€ ${Calc.formatItCurrency(ns.totaliDiarie.impTot)}</span>
+          ${subValutaHtml(ns.totaliDiarie.unconverted)}
         </div>
         <div class="kpi-item">
           <span class="kpi-label">Viaggio &amp; Varie</span>
           <span class="kpi-value">€ ${Calc.formatItCurrency(ns.speseViaggioDoc)}</span>
+          ${subValutaHtml(ns.speseViaggioUnconverted)}
         </div>
         <div class="kpi-item">
           <span class="kpi-label">Altre Spese</span>
           <span class="kpi-value">€ ${Calc.formatItCurrency(ns.altreSpese)}</span>
+          ${subValutaHtml(ns.altreSpeseUnconverted)}
         </div>
         <div class="kpi-item">
           <span class="kpi-label">Totale Trasferta</span>
           <span class="kpi-value accent">€ ${Calc.formatItCurrency(ns.totaleTrasferta)}</span>
+          ${subValutaHtml(ns.totaleUnconverted)}
         </div>
         <div class="kpi-item">
           <span class="kpi-label">Residuo Netto</span>
           <span class="kpi-value net">€ ${Calc.formatItCurrency(ns.residuoNetto)}</span>
+          ${subValutaHtml(ns.totaleUnconverted)}
         </div>
       </div>
       <div class="kpi-warnings">
-        ${warnHtml}
+        ${statusHtml}
       </div>
     `;
   }
@@ -347,17 +374,29 @@
           `;
         }
         const savedItem = (state.trip.paesiVisitati || []).find((p) => p.code === vc.code) || {};
+        const cambioPending = vc.isUnconverted || vc.cambio === null;
+        const cambioText = cambioPending ? 'Da uff.' : vc.cambio.toFixed(4).replace('.', ',');
+        const cambioCls = cambioPending ? 'cell-readonly cell-valuta-pending' : 'cell-readonly';
+        const cambioTitle = cambioPending
+          ? 'Cambio non inserito: gli importi restano in valuta locale, il cambio sarà applicato dall\'Ufficio Trasferte'
+          : '';
+        const cap2Str = vc.capsCurrency === 'EUR'
+          ? `€ ${Calc.formatItCurrency(vc.twoMealsValuta)}`
+          : `${Calc.formatItCurrency(vc.twoMealsValuta)} ${vc.localCurrency}`;
+        const cap1Str = vc.capsCurrency === 'EUR'
+          ? `€ ${Calc.formatItCurrency(vc.oneMealValuta)}`
+          : `${Calc.formatItCurrency(vc.oneMealValuta)} ${vc.localCurrency}`;
         return `
           <tr data-vc-code="${escHtml(vc.code)}">
             <td><strong>${escHtml(vc.code)}</strong> · ${escHtml(vc.name)}</td>
             <td style="text-align:center;">${escHtml(vc.localCurrency)}</td>
             <td><input class="cell-input num" type="number" step="0.01" min="0" data-vc-field="euro" value="${escHtml(savedItem.euro ?? '')}" placeholder="€"></td>
             <td><input class="cell-input num" type="number" step="0.01" min="0" data-vc-field="valuta" value="${escHtml(savedItem.valuta ?? '')}" placeholder="${escHtml(vc.localCurrency)}"></td>
-            <td><span class="cell-readonly" data-vc-out="cambio">${vc.cambio.toFixed(4).replace('.', ',')}</span></td>
+            <td><span class="${cambioCls}" data-vc-out="cambio" title="${escHtml(cambioTitle)}">${escHtml(cambioText)}</span></td>
             <td><input class="cell-input num" type="number" step="0.01" min="0" data-vc-field="commEur" value="${escHtml(savedItem.commEur ?? '')}" placeholder="€"></td>
             <td><input class="cell-input num" type="number" step="0.01" min="0" data-vc-field="commValuta" value="${escHtml(savedItem.commValuta ?? '')}" placeholder="${escHtml(vc.localCurrency)}"></td>
-            <td><span class="cell-readonly" data-vc-out="cap2">${Calc.formatItCurrency(vc.twoMealsValuta)} ${escHtml(vc.localCurrency)}</span></td>
-            <td><span class="cell-readonly" data-vc-out="cap1">${Calc.formatItCurrency(vc.oneMealValuta)} ${escHtml(vc.localCurrency)}</span></td>
+            <td><span class="cell-readonly" data-vc-out="cap2">${escHtml(cap2Str)}</span></td>
+            <td><span class="cell-readonly" data-vc-out="cap1">${escHtml(cap1Str)}</span></td>
             <td style="text-align:center;">
               <input type="checkbox" data-vc-field="showOnModulo"${savedItem.showOnModulo !== false ? ' checked' : ''} title="Includi nella tabella CAMBI su Modulo 1">
             </td>
@@ -430,9 +469,24 @@
       const cEl = tr.querySelector('[data-vc-out="cambio"]');
       const c2El = tr.querySelector('[data-vc-out="cap2"]');
       const c1El = tr.querySelector('[data-vc-out="cap1"]');
-      if (cEl) cEl.textContent = vc.cambio.toFixed(4).replace('.', ',');
-      if (c2El) c2El.textContent = `${Calc.formatItCurrency(vc.twoMealsValuta)} ${vc.localCurrency}`;
-      if (c1El) c1El.textContent = `${Calc.formatItCurrency(vc.oneMealValuta)} ${vc.localCurrency}`;
+      const cambioPending = vc.isUnconverted || vc.cambio === null;
+      if (cEl) {
+        cEl.textContent = cambioPending ? 'Da uff.' : vc.cambio.toFixed(4).replace('.', ',');
+        cEl.className = cambioPending ? 'cell-readonly cell-valuta-pending' : 'cell-readonly';
+        cEl.title = cambioPending
+          ? 'Cambio non inserito: gli importi restano in valuta locale, il cambio sarà applicato dall\'Ufficio Trasferte'
+          : '';
+      }
+      if (c2El) {
+        c2El.textContent = vc.capsCurrency === 'EUR'
+          ? `€ ${Calc.formatItCurrency(vc.twoMealsValuta)}`
+          : `${Calc.formatItCurrency(vc.twoMealsValuta)} ${vc.localCurrency}`;
+      }
+      if (c1El) {
+        c1El.textContent = vc.capsCurrency === 'EUR'
+          ? `€ ${Calc.formatItCurrency(vc.oneMealValuta)}`
+          : `${Calc.formatItCurrency(vc.oneMealValuta)} ${vc.localCurrency}`;
+      }
     });
   }
 
@@ -682,6 +736,8 @@
       if (row.warnings.pDisallowed) warnMessages.push('Pranzo IT non spettante per orario');
       if (row.warnings.cDisallowed) warnMessages.push('Cena IT non spettante per orario');
       if (row.warnings.nDisallowed) warnMessages.push('Pernotto Forfait IT oltre notti spettanti');
+      if (row.warnings.pForeignItForfait) warnMessages.push('Pranzo: "Forfait" vale solo per IT (usa Forf.Misto per l\'estero)');
+      if (row.warnings.cForeignItForfait) warnMessages.push('Cena: "Forfait" vale solo per IT (usa Forf.Misto per l\'estero)');
 
       const dot = tr.querySelector(`[data-row-warn="${CSS.escape(row.iso)}"]`);
       if (dot) {
@@ -709,6 +765,11 @@
         const ev = evalRows[i] || { totDipEur: 0 };
         const isFirst = i === 0;
         const isLast = i === list.length - 1;
+        const outText = ev.isUnconverted
+          ? `${Calc.formatItCurrency(ev.unconvertedAmount)} ${ev.unconvertedCurrency}`
+          : `€ ${Calc.formatItCurrency(ev.totDipEur)}`;
+        const outCls = ev.isUnconverted ? 'cell-readonly cell-valuta-pending' : 'cell-readonly';
+        const outTitle = ev.isUnconverted ? 'Importo in valuta locale (cambio a cura Uff. Trasferte)' : '';
         return `
           <tr data-tk-idx="${i}">
             <td style="text-align:center; color:var(--text-muted);">${i + 1}</td>
@@ -726,7 +787,7 @@
             <td><input class="cell-input num" type="number" step="0.01" min="0" data-tk-f="pagatiDipValuta" value="${escHtml(b.pagatiDipValuta)}" placeholder="Val."></td>
             <td><select class="cell-select" data-tk-f="code">${buildVisitedOptionsHtml(visited, b.code || 'IT', false)}</select></td>
             <td><input class="cell-input num" type="number" step="0.01" min="0" data-tk-f="pagatiRaiEur" value="${escHtml(b.pagatiRaiEur)}" placeholder="€"></td>
-            <td><span class="cell-readonly" data-tk-out="eur">€ ${Calc.formatItCurrency(ev.totDipEur)}</span></td>
+            <td><span class="${outCls}" data-tk-out="eur" title="${escHtml(outTitle)}">${escHtml(outText)}</span></td>
             <td style="text-align:center; white-space:nowrap;">
               <button type="button" class="btn btn-xs btn-ghost" data-tk-move="up" title="Sposta su"${isFirst ? ' disabled' : ''}>↑</button>
               <button type="button" class="btn btn-xs btn-ghost" data-tk-move="down" title="Sposta giù"${isLast ? ' disabled' : ''}>↓</button>
@@ -751,7 +812,7 @@
               <th style="width:92px;">Pag. Dip (Val.)</th>
               <th style="width:130px;">Paese</th>
               <th style="width:92px;">Pag. RAI (€)</th>
-              <th style="width:95px;">Tot. Dip (€)</th>
+              <th style="width:120px;">Tot. Dip (€ / Val.)</th>
               <th style="width:96px;">Ordine / Az.</th>
             </tr>
           </thead>
@@ -760,7 +821,7 @@
             <tr style="background:var(--surface-alt); font-weight:700;">
               <td colspan="8" style="text-align:right;">Totali Biglietti / Tappe:</td>
               <td class="num" style="text-align:right;" id="tk-tot-rai">€ ${Calc.formatItCurrency(state.calc.tickets.totPagatiRaiEur)}</td>
-              <td class="num" style="text-align:right;" id="tk-tot-dip">€ ${Calc.formatItCurrency(state.calc.tickets.totPagatiDipComplEur)}</td>
+              <td class="num" style="text-align:right;" id="tk-tot-dip">${escHtml(Calc.formatEurWithExtras(state.calc.tickets.totPagatiDipComplEur, state.calc.tickets.unconvertedByCurrency, true))}</td>
               <td></td>
             </tr>
           </tfoot>
@@ -812,11 +873,26 @@
   function syncTicketsOutputs(container, calc) {
     calc.tickets.rows.forEach((r, i) => {
       const out = container.querySelector(`tr[data-tk-idx="${i}"] [data-tk-out="eur"]`);
-      if (out) out.textContent = `€ ${Calc.formatItCurrency(r.totDipEur)}`;
+      if (!out) return;
+      if (r.isUnconverted) {
+        out.textContent = `${Calc.formatItCurrency(r.unconvertedAmount)} ${r.unconvertedCurrency}`;
+        out.className = 'cell-readonly cell-valuta-pending';
+        out.title = 'Importo in valuta locale (cambio a cura Uff. Trasferte)';
+      } else {
+        out.textContent = `€ ${Calc.formatItCurrency(r.totDipEur)}`;
+        out.className = 'cell-readonly';
+        out.title = '';
+      }
     });
     const tDip = container.querySelector('#tk-tot-dip');
     const tRai = container.querySelector('#tk-tot-rai');
-    if (tDip) tDip.textContent = `€ ${Calc.formatItCurrency(calc.tickets.totPagatiDipComplEur)}`;
+    if (tDip) {
+      tDip.textContent = Calc.formatEurWithExtras(
+        calc.tickets.totPagatiDipComplEur,
+        calc.tickets.unconvertedByCurrency,
+        true
+      );
+    }
     if (tRai) tRai.textContent = `€ ${Calc.formatItCurrency(calc.tickets.totPagatiRaiEur)}`;
   }
 
@@ -835,6 +911,11 @@
     const rowsHtml = list
       .map((s, i) => {
         const ev = evalRows[i] || { convEur: 0, moduleNumber: Math.floor(i / 8) + 1 };
+        const outText = ev.isUnconverted
+          ? `${Calc.formatItCurrency(ev.unconvertedAmount)} ${ev.unconvertedCurrency}`
+          : `€ ${Calc.formatItCurrency(ev.convEur)}`;
+        const outCls = ev.isUnconverted ? 'cell-readonly cell-valuta-pending' : 'cell-readonly';
+        const outTitle = ev.isUnconverted ? 'Importo in valuta locale (cambio a cura Uff. Trasferte)' : '';
         return `
           <tr data-sv-idx="${i}">
             <td style="text-align:center;">
@@ -845,7 +926,7 @@
             <td><input class="cell-input num" type="number" step="0.01" min="0" data-sv-f="pagateDipEur" value="${escHtml(s.pagateDipEur)}" placeholder="€"></td>
             <td><input class="cell-input num" type="number" step="0.01" min="0" data-sv-f="pagateDipValuta" value="${escHtml(s.pagateDipValuta)}" placeholder="Val."></td>
             <td><select class="cell-select" data-sv-f="code">${buildVisitedOptionsHtml(visited, s.code || 'IT', false)}</select></td>
-            <td><span class="cell-readonly" data-sv-out="eur">€ ${Calc.formatItCurrency(ev.convEur)}</span></td>
+            <td><span class="${outCls}" data-sv-out="eur" title="${escHtml(outTitle)}">${escHtml(outText)}</span></td>
             <td style="text-align:center;"><button type="button" class="btn btn-xs btn-ghost-danger" data-sv-del="${i}">✕</button></td>
           </tr>
         `;
@@ -863,7 +944,7 @@
               <th style="width:98px;">Pagate (€)</th>
               <th style="width:98px;">Pagate (Val.)</th>
               <th style="width:140px;">Paese</th>
-              <th style="width:100px;">Equiv. (€)</th>
+              <th style="width:130px;">Importo (€ / Val.)</th>
               <th style="width:40px;"></th>
             </tr>
           </thead>
@@ -871,7 +952,7 @@
           <tfoot>
             <tr style="background:var(--surface-alt); font-weight:700;">
               <td colspan="6" style="text-align:right;">Totale Spese Varie Documentate:</td>
-              <td class="num" style="text-align:right;" id="sv-tot-eur">€ ${Calc.formatItCurrency(state.calc.speseVarie.totEur)}</td>
+              <td class="num" style="text-align:right;" id="sv-tot-eur">${escHtml(Calc.formatEurWithExtras(state.calc.speseVarie.totEur, state.calc.speseVarie.unconvertedByCurrency, true))}</td>
               <td></td>
             </tr>
           </tfoot>
@@ -914,10 +995,25 @@
   function syncSpeseOutputs(container, calc) {
     calc.speseVarie.rows.forEach((r, i) => {
       const out = container.querySelector(`tr[data-sv-idx="${i}"] [data-sv-out="eur"]`);
-      if (out) out.textContent = `€ ${Calc.formatItCurrency(r.convEur)}`;
+      if (!out) return;
+      if (r.isUnconverted) {
+        out.textContent = `${Calc.formatItCurrency(r.unconvertedAmount)} ${r.unconvertedCurrency}`;
+        out.className = 'cell-readonly cell-valuta-pending';
+        out.title = 'Importo in valuta locale (cambio a cura Uff. Trasferte)';
+      } else {
+        out.textContent = `€ ${Calc.formatItCurrency(r.convEur)}`;
+        out.className = 'cell-readonly';
+        out.title = '';
+      }
     });
     const tot = container.querySelector('#sv-tot-eur');
-    if (tot) tot.textContent = `€ ${Calc.formatItCurrency(calc.speseVarie.totEur)}`;
+    if (tot) {
+      tot.textContent = Calc.formatEurWithExtras(
+        calc.speseVarie.totEur,
+        calc.speseVarie.unconvertedByCurrency,
+        true
+      );
+    }
   }
 
   function bindStaticEditorEvents(container, state, actions) {

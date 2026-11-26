@@ -143,7 +143,7 @@
             const sumComm = c.commEur + c.commValuta;
             cCommStr = `${fmtAmt(sumComm, 2)} ${c.commEur > 0 ? 'Eur' : c.localCurrency}`;
           }
-          if (c.valuta > 0 && c.euro > 0) {
+          if (c.valuta > 0 && c.euro > 0 && c.cambio > 0) {
             cRateStr = c.cambio.toLocaleString('it-IT', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
           }
         }

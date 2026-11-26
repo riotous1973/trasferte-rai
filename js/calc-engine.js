@@ -152,6 +152,52 @@
     });
   }
 
+  function addCurrencyAmount(map, currency, amount) {
+    const curr = String(currency || '').trim();
+    const val = toNum(amount);
+    if (!curr || curr === 'EUR' || val <= 0) return;
+    map[curr] = (map[curr] || 0) + val;
+  }
+
+  function finalizeCurrencyMap(map) {
+    const out = {};
+    if (!map) return out;
+    Object.keys(map)
+      .sort()
+      .forEach((curr) => {
+        const rounded = round2(map[curr]);
+        if (rounded > 0) out[curr] = rounded;
+      });
+    return out;
+  }
+
+  function mergeCurrencyMaps(...maps) {
+    const acc = {};
+    maps.forEach((m) => {
+      if (!m) return;
+      Object.keys(m).forEach((curr) => {
+        addCurrencyAmount(acc, curr, m[curr]);
+      });
+    });
+    return finalizeCurrencyMap(acc);
+  }
+
+  function formatCurrencyExtras(currencyMap) {
+    if (!currencyMap) return '';
+    const parts = Object.keys(currencyMap)
+      .filter((c) => toNum(currencyMap[c]) > 0)
+      .map((c) => `${formatItCurrency(currencyMap[c])} ${c}`);
+    return parts.join(' + ');
+  }
+
+  function formatEurWithExtras(eurAmount, currencyMap, alwaysShowEur) {
+    const extras = formatCurrencyExtras(currencyMap);
+    const eurVal = toNum(eurAmount);
+    if (!extras) return `€ ${formatItCurrency(eurVal)}`;
+    if (!alwaysShowEur && Math.abs(eurVal) < 1e-9) return extras;
+    return `€ ${formatItCurrency(eurVal)} + ${extras}`;
+  }
+
   function buildCountriesMap(countries) {
     const map = Object.create(null);
     map.IT = Defaults.ITALY_COUNTRY;
@@ -222,11 +268,14 @@
       commEur: 0,
       commValuta: 0,
       commValutaEur: 0,
+      commValutaUnconverted: 0,
       twoMealsValuta: toNum(itRates.pasto1),
       oneMealValuta: 0,
+      capsCurrency: 'EUR',
       rates: null,
       showOnModulo: false,
       isItaly: true,
+      isUnconverted: false,
       hasRateWarning: false,
     };
     entries.push(itEntry);
@@ -234,6 +283,7 @@
 
     let totCommEur = 0;
     let totCommValutaEur = 0;
+    const commUnconverted = {};
 
     const visited = Array.isArray(trip && trip.paesiVisitati) ? trip.paesiVisitati : [];
     visited.forEach((item) => {
@@ -243,38 +293,44 @@
       const country = countriesMap[code];
       if (!country) return;
 
+      const localCurr = country.localCurrency || 'EUR';
+      const isEurCurrency = localCurr === 'EUR';
       const euro = toNum(item.euro);
       const valuta = toNum(item.valuta);
-      const cambio = euro > 0 && valuta > 0 ? valuta / euro : 1;
+      const hasCustomRate = euro > 0 && valuta > 0;
+      const isUnconverted = !isEurCurrency && !hasCustomRate;
+      const cambio = isEurCurrency ? 1 : hasCustomRate ? valuta / euro : null;
       const commEur = toNum(item.commEur);
       const commValuta = toNum(item.commValuta);
-      const commValutaEur = commValuta > 0 ? commValuta / cambio : 0;
+      const commValutaEur = commValuta > 0 && !isUnconverted && cambio > 0 ? commValuta / cambio : 0;
+      const commValutaUnconverted = commValuta > 0 && isUnconverted ? commValuta : 0;
 
       totCommEur += commEur;
       totCommValutaEur += commValutaEur;
+      addCurrencyAmount(commUnconverted, localCurr, commValutaUnconverted);
 
       const cRates = computeCountryRates(country, exchangeRates);
-      const hasRateWarning =
-        country.localCurrency &&
-        country.localCurrency !== 'EUR' &&
-        (euro <= 0 || valuta <= 0);
+      const hasRateWarning = isUnconverted;
 
       const resolved = {
         code,
         name: country.name,
-        localCurrency: country.localCurrency || 'EUR',
-        moduloCurrencyLabel: country.localCurrency || 'EUR',
+        localCurrency: localCurr,
+        moduloCurrencyLabel: localCurr,
         euro,
         valuta,
         cambio,
         commEur,
         commValuta,
         commValutaEur,
-        twoMealsValuta: cRates.twoMealsEur * cambio,
-        oneMealValuta: cRates.oneMealEur * cambio,
+        commValutaUnconverted,
+        twoMealsValuta: isUnconverted ? cRates.twoMealsEur : cRates.twoMealsEur * cambio,
+        oneMealValuta: isUnconverted ? cRates.oneMealEur : cRates.oneMealEur * cambio,
+        capsCurrency: isUnconverted ? 'EUR' : localCurr,
         rates: cRates,
         showOnModulo: item.showOnModulo !== false,
         isItaly: false,
+        isUnconverted,
         hasRateWarning,
       };
       entries.push(resolved);
@@ -287,6 +343,7 @@
       totCommEur,
       totCommValutaEur,
       totCommissioniEur: totCommEur + totCommValutaEur,
+      totCommissioniUnconverted: finalizeCurrencyMap(commUnconverted),
     };
   }
 
@@ -504,6 +561,7 @@
 
     let pEffValuta = 0;
     let pEffEurEstero = 0;
+    let pUnconvertedValuta = 0;
     let pPsEstero = 0;
     let pForfEstero = 0;
     let pOverCap = false;
@@ -514,13 +572,20 @@
       const capValuta = twoMealsMode === 2 ? cap2 : cap1;
       const rawVal = pQuota || 0;
       if (pRic > 0 && pHasForeignQuota) {
-        if (isTravelMealNote(pNote)) {
+        if (pCountry.isUnconverted) {
           pEffValuta = rawVal;
+          pEffEurEstero = 0;
+          pUnconvertedValuta = rawVal;
+          pOverCap = false;
         } else {
-          pEffValuta = Math.min(rawVal, capValuta);
-          if (rawVal > capValuta + 1e-6) pOverCap = true;
+          if (isTravelMealNote(pNote)) {
+            pEffValuta = rawVal;
+          } else {
+            pEffValuta = Math.min(rawVal, capValuta);
+            if (rawVal > capValuta + 1e-6) pOverCap = true;
+          }
+          pEffEurEstero = pEffValuta / pCountry.cambio;
         }
-        pEffEurEstero = pEffValuta / pCountry.cambio;
       }
       if (pNote === 'Forf.Tot') {
         pPsEstero = pCountry.rates.forfaitTotaleEur / 40;
@@ -533,6 +598,7 @@
 
     let cEffValuta = 0;
     let cEffEurEstero = 0;
+    let cUnconvertedValuta = 0;
     let cPsEstero = 0;
     let cForfEstero = 0;
     let cOverCap = false;
@@ -543,13 +609,20 @@
       const capValuta = twoMealsMode === 2 ? cap2 : cap1;
       const rawVal = cQuota || 0;
       if (cRic > 0 && cHasForeignQuota) {
-        if (isTravelMealNote(cNote)) {
+        if (cCountry.isUnconverted) {
           cEffValuta = rawVal;
+          cEffEurEstero = 0;
+          cUnconvertedValuta = rawVal;
+          cOverCap = false;
         } else {
-          cEffValuta = Math.min(rawVal, capValuta);
-          if (rawVal > capValuta + 1e-6) cOverCap = true;
+          if (isTravelMealNote(cNote)) {
+            cEffValuta = rawVal;
+          } else {
+            cEffValuta = Math.min(rawVal, capValuta);
+            if (rawVal > capValuta + 1e-6) cOverCap = true;
+          }
+          cEffEurEstero = cEffValuta / cCountry.cambio;
         }
-        cEffEurEstero = cEffValuta / cCountry.cambio;
       }
       if (cNote === 'Forf.Tot') {
         cPsEstero = cCountry.rates.forfaitTotaleEur / 40;
@@ -561,17 +634,23 @@
     }
 
     let nEur = 0;
+    let nUnconvertedValuta = 0;
     let nPsEstero = 0;
     let nForfEstero = 0;
     if (nCountry && !nCountry.isItaly) {
-      if (nRic > 0) nEur = nRic / nCountry.cambio;
+      if (nRic > 0) {
+        if (nCountry.isUnconverted) nUnconvertedValuta = nRic;
+        else nEur = nRic / nCountry.cambio;
+      }
       nPsEstero = nNote === 'FT' ? 0 : nCountry.rates.piccoleSpeseEur * 0.5;
       nForfEstero = nNote === 'FT' ? nCountry.rates.forfaitTotaleEur / 1.819 : 0;
     }
 
     let colPdlEurEstero = 0;
+    let colUnconvertedValuta = 0;
     if (colCountry && !colCountry.isItaly && colQuota !== null && colQuota > 0) {
-      colPdlEurEstero = colQuota / colCountry.cambio;
+      if (colCountry.isUnconverted) colUnconvertedValuta = colQuota;
+      else colPdlEurEstero = colQuota / colCountry.cambio;
     }
 
     // --- ITALIA PDL, Massimali, Piccole Spese, Indennità ---
@@ -647,6 +726,8 @@
         pDisallowed: verificaPranzi === 1 && pCode === 'IT' && (pRic > 0 || pNote === 'Forfait' || pNote === 'FMM'),
         cDisallowed: verificaCene === 1 && cCode === 'IT' && (cRic > 0 || cNote === 'Forfait' || cNote === 'FMM'),
         nDisallowed: verificaPernotti === 1 && nCode === 'IT' && nNote === 'Forfait',
+        pForeignItForfait: Boolean(pCode && pCode !== 'IT' && (pNote === 'Forfait' || pNote === 'FMM')),
+        cForeignItForfait: Boolean(cCode && cCode !== 'IT' && (cNote === 'Forfait' || cNote === 'FMM')),
       },
       pranzo: {
         ricevuta: p.ricevuta ?? '',
@@ -657,6 +738,7 @@
         countryName: pCountry ? pCountry.name : '',
         currencyLabel: pCountry ? (pCountry.isItaly ? 'Euro' : pCountry.localCurrency) : '',
         effEurEstero: pEffEurEstero,
+        unconvertedValuta: pUnconvertedValuta,
         psEstero: pPsEstero,
         forfEstero: pForfEstero,
         pdlIt: pPdlIt,
@@ -677,6 +759,7 @@
         countryName: cCountry ? cCountry.name : '',
         currencyLabel: cCountry ? (cCountry.isItaly ? 'Euro' : cCountry.localCurrency) : '',
         effEurEstero: cEffEurEstero,
+        unconvertedValuta: cUnconvertedValuta,
         psEstero: cPsEstero,
         forfEstero: cForfEstero,
         pdlIt: cPdlIt,
@@ -695,6 +778,7 @@
         countryName: nCountry ? nCountry.name : '',
         currencyLabel: nCountry ? (nCountry.isItaly ? 'Euro' : nCountry.localCurrency) : '',
         eur: nCountry ? (nCountry.isItaly ? nEurIt : nEur) : 0,
+        unconvertedValuta: nUnconvertedValuta,
         psEstero: nPsEstero,
         forfEstero: nForfEstero,
         forfIt: nForfIt,
@@ -710,6 +794,7 @@
         countryName: colCountry ? colCountry.name : '',
         currencyLabel: colCountry ? (colCountry.isItaly ? 'Euro' : colCountry.localCurrency) : '',
         pdlEurEstero: colPdlEurEstero,
+        unconvertedValuta: colUnconvertedValuta,
         forfIt: forfaitColazIt,
         pdlIt: colPdlIt,
       },
@@ -722,14 +807,22 @@
     let totPagatiDipValuta = 0;
     let totPagatiDipValutaInEur = 0;
     let totPagatiRaiEur = 0;
+    const unconvertedAcc = {};
 
     const rows = list.map((b) => {
       const code = String(b.code || '').trim();
       const country = visitedByCode[code] || null;
-      const cambio = country ? country.cambio : 1;
       const dipEur = toNum(b.pagatiDipEur);
       const dipValuta = toNum(b.pagatiDipValuta);
-      const dipValutaInEur = dipValuta > 0 && country ? dipValuta / cambio : 0;
+      const isUnconverted = Boolean(dipValuta > 0 && dipEur === 0 && country && country.isUnconverted);
+      const dipValutaInEur =
+        dipValuta > 0 && country && !country.isUnconverted && country.cambio > 0
+          ? dipValuta / country.cambio
+          : 0;
+      const unconvertedAmount = isUnconverted ? dipValuta : 0;
+      const unconvertedCurrency = isUnconverted ? country.localCurrency : '';
+      if (isUnconverted) addCurrencyAmount(unconvertedAcc, unconvertedCurrency, unconvertedAmount);
+
       const raiEur = toNum(b.pagatiRaiEur);
 
       totPagatiDipEur += dipEur;
@@ -752,6 +845,9 @@
         displayDipAmount,
         displayDipCurrency,
         totDipEur: dipEur + dipValutaInEur,
+        isUnconverted,
+        unconvertedAmount,
+        unconvertedCurrency,
         raiEur,
       };
     });
@@ -762,6 +858,7 @@
       totPagatiDipValuta,
       totPagatiDipValutaInEur,
       totPagatiDipComplEur: totPagatiDipEur + totPagatiDipValutaInEur,
+      unconvertedByCurrency: finalizeCurrencyMap(unconvertedAcc),
       totPagatiRaiEur,
     };
   }
@@ -769,14 +866,22 @@
   function evaluateSpeseVarie(speseVarie, visitedByCode) {
     const list = Array.isArray(speseVarie) ? speseVarie.slice(0, 24) : [];
     let totEur = 0;
+    const unconvertedAcc = {};
 
     const rows = list.map((s, idx) => {
       const code = String(s.code || '').trim();
       const country = visitedByCode[code] || null;
-      const cambio = country ? country.cambio : 1;
       const eur = toNum(s.pagateDipEur);
       const valuta = toNum(s.pagateDipValuta);
-      const valutaInEur = valuta > 0 && country ? valuta / cambio : 0;
+      const isUnconverted = Boolean(valuta > 0 && eur === 0 && country && country.isUnconverted);
+      const valutaInEur =
+        valuta > 0 && country && !country.isUnconverted && country.cambio > 0
+          ? valuta / country.cambio
+          : 0;
+      const unconvertedAmount = isUnconverted ? valuta : 0;
+      const unconvertedCurrency = isUnconverted ? country.localCurrency : '';
+      if (isUnconverted) addCurrencyAmount(unconvertedAcc, unconvertedCurrency, unconvertedAmount);
+
       const convEur = eur + valutaInEur;
       totEur += convEur;
 
@@ -796,12 +901,16 @@
         displayAmount,
         displayCurrency,
         convEur,
+        isUnconverted,
+        unconvertedAmount,
+        unconvertedCurrency,
       };
     });
 
     return {
       rows,
       totEur,
+      unconvertedByCurrency: finalizeCurrencyMap(unconvertedAcc),
     };
   }
 
@@ -891,13 +1000,14 @@
 
     // Somme e conteggi identici a Elaborazione!R106 e R213:R227
     const colazPdlCount =
-      cnt((r) => r.colazione.pdlEurEstero > 0) + cnt((r) => r.colazione.pdlIt > 0);
+      cnt((r) => r.colazione.pdlEurEstero > 0 || r.colazione.unconvertedValuta > 0) +
+      cnt((r) => r.colazione.pdlIt > 0);
     const colazPdlEur = sum((r) => r.colazione.pdlEurEstero + r.colazione.pdlIt);
     const colazForfCount = cnt((r) => r.colazione.forfIt > 0);
     const colazForfEur = sum((r) => r.colazione.forfIt);
 
-    const pEstPdlCount = cnt((r) => r.pranzo.effEurEstero > 0);
-    const cEstPdlCount = cnt((r) => r.cena.effEurEstero > 0);
+    const pEstPdlCount = cnt((r) => r.pranzo.effEurEstero > 0 || r.pranzo.unconvertedValuta > 0);
+    const cEstPdlCount = cnt((r) => r.cena.effEurEstero > 0 || r.cena.unconvertedValuta > 0);
     const pEstPdlEur = sum((r) => r.pranzo.effEurEstero);
     const cEstPdlEur = sum((r) => r.cena.effEurEstero);
 
@@ -947,11 +1057,25 @@
       pItForfCount + cItForfCount + pEstForfCount + cEstForfCount;
     const pastiForfEur = pEstForfEur + cEstForfEur + totForfIt - fmmAdjustment;
 
-    const pernottiPdlCount = cnt((r) => r.pernotto.eur > 0);
+    const pernottiPdlCount = cnt((r) => r.pernotto.eur > 0 || r.pernotto.unconvertedValuta > 0);
     const pernottiPdlEur = sum((r) => r.pernotto.eur);
     const pernottiForfCount =
       cnt((r) => r.pernotto.forfEstero > 0) + cnt((r) => r.pernotto.forfIt > 0);
     const pernottiForfEur = sum((r) => r.pernotto.forfEstero + r.pernotto.forfIt);
+
+    const colazUnconvertedAcc = {};
+    const pastiUnconvertedAcc = {};
+    const pernottiUnconvertedAcc = {};
+    dailyRows.forEach((r) => {
+      addCurrencyAmount(colazUnconvertedAcc, r.colazione.currencyLabel, r.colazione.unconvertedValuta);
+      addCurrencyAmount(pastiUnconvertedAcc, r.pranzo.currencyLabel, r.pranzo.unconvertedValuta);
+      addCurrencyAmount(pastiUnconvertedAcc, r.cena.currencyLabel, r.cena.unconvertedValuta);
+      addCurrencyAmount(pernottiUnconvertedAcc, r.pernotto.currencyLabel, r.pernotto.unconvertedValuta);
+    });
+    const colazUnconverted = finalizeCurrencyMap(colazUnconvertedAcc);
+    const pastiUnconverted = finalizeCurrencyMap(pastiUnconvertedAcc);
+    const pernottiUnconverted = finalizeCurrencyMap(pernottiUnconvertedAcc);
+    const diarieUnconverted = mergeCurrencyMaps(colazUnconverted, pastiUnconverted, pernottiUnconverted);
 
     const psCount =
       cnt((r) => r.pranzo.psIt > 0) +
@@ -980,6 +1104,12 @@
     const ticketsEval = evaluateTickets(safeTrip.biglietti, visitedEval.byCode);
     const speseEval = evaluateSpeseVarie(safeTrip.speseVarie, visitedEval.byCode);
 
+    const bigliettiUnconverted = ticketsEval.unconvertedByCurrency;
+    const speseVarieUnconverted = speseEval.unconvertedByCurrency;
+    const speseViaggioUnconverted = mergeCurrencyMaps(bigliettiUnconverted, speseVarieUnconverted);
+    const altreSpeseUnconverted = visitedEval.totCommissioniUnconverted;
+    const totaleUnconverted = mergeCurrencyMaps(diarieUnconverted, speseViaggioUnconverted, altreSpeseUnconverted);
+
     const speseViaggioDoc = ticketsEval.totPagatiDipComplEur + speseEval.totEur;
     const altreSpese = visitedEval.totCommissioniEur;
     const totaleTrasferta = totaliDiarie + speseViaggioDoc + altreSpese;
@@ -999,18 +1129,20 @@
       totForfIt;
 
     const warningsList = [];
+    const infoNotes = [];
     dailyRows.forEach((r) => {
       if (r.warnings.pMissingCovers) warningsList.push(`${r.dateParts.ddmm}: coperti mancanti a Pranzo`);
       if (r.warnings.cMissingCovers) warningsList.push(`${r.dateParts.ddmm}: coperti mancanti a Cena`);
       if (r.warnings.colMissingCovers) warningsList.push(`${r.dateParts.ddmm}: coperti mancanti a Colazione`);
       if (r.warnings.pOverCap) warningsList.push(`${r.dateParts.ddmm}: Pranzo estero oltre massimale`);
       if (r.warnings.cOverCap) warningsList.push(`${r.dateParts.ddmm}: Cena estera oltre massimale`);
-    });
-    visitedEval.entries.forEach((vc) => {
-      if (vc.hasRateWarning) {
-        warningsList.push(`Cambio mancante per ${vc.name} (${vc.localCurrency}): cambio impostato a 1`);
+      if (r.warnings.pForeignItForfait || r.warnings.cForeignItForfait) {
+        warningsList.push(`${r.dateParts.ddmm}: "Forfait" vale solo per IT (usa Forf.Misto per l'estero)`);
       }
     });
+    if (Object.keys(totaleUnconverted).length > 0) {
+      infoNotes.push(`In valuta (cambio a cura Uff. Trasferte): ${formatCurrencyExtras(totaleUnconverted)}`);
+    }
 
     const notaSpese = {
       colazioni: {
@@ -1020,6 +1152,7 @@
         countForf: colazForfCount,
         impForf: round2(colazForfEur),
         impTot: round2(colazPdlEur + colazForfEur),
+        unconverted: colazUnconverted,
       },
       pasti: {
         countTot: pastiPdlCount + pastiForfCount,
@@ -1028,6 +1161,7 @@
         countForf: pastiForfCount,
         impForf: round2(pastiForfEur),
         impTot: round2(pastiPdlEur + pastiForfEur),
+        unconverted: pastiUnconverted,
       },
       pernottamenti: {
         countTot: schedule.totNotti,
@@ -1036,6 +1170,7 @@
         countForf: pernottiForfCount,
         impForf: round2(pernottiForfEur),
         impTot: round2(pernottiPdlEur + pernottiForfEur),
+        unconverted: pernottiUnconverted,
       },
       piccoleSpese: {
         countTot: psCount,
@@ -1053,12 +1188,18 @@
         impPdl: round2(totaliDiariePdl),
         impForf: round2(totaliDiarieForf),
         impTot: round2(totaliDiarie),
+        unconverted: diarieUnconverted,
       },
       speseViaggioDoc: round2(speseViaggioDoc),
+      speseViaggioUnconverted,
       bigliettiDipEur: round2(ticketsEval.totPagatiDipComplEur),
+      bigliettiUnconverted,
       speseVarieEur: round2(speseEval.totEur),
+      speseVarieUnconverted,
       altreSpese: round2(altreSpese),
+      altreSpeseUnconverted,
       totaleTrasferta: round2(totaleTrasferta),
+      totaleUnconverted,
       spesePerContoRai: round2(ticketsEval.totPagatiRaiEur),
       anticipi: round2(anticipi),
       residuoNetto: round2(residuoNetto),
@@ -1091,6 +1232,7 @@
       notaSpese,
       moduloPages,
       warnings: warningsList,
+      infoNotes,
     };
   }
 
@@ -1102,6 +1244,8 @@
     formatDateDDMM,
     formatItNumber,
     formatItCurrency,
+    formatCurrencyExtras,
+    formatEurWithExtras,
     buildCountriesMap,
     computeCountryRates,
     computeVisitedCountries,

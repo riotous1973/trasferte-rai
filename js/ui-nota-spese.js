@@ -11,12 +11,32 @@
     return `€ ${Calc.formatItCurrency(v)}`;
   }
 
+  function escHtml(val) {
+    return String(val ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function fmtWithExtras(v, unconvertedMap) {
+    const extras = Calc.formatCurrencyExtras(unconvertedMap);
+    if (!extras) return fmt(v);
+    return `${fmt(v)}<div class="nota-sub-valuta" title="Importo in valuta locale (cambio a cura Uff. Trasferte)">+ ${escHtml(extras)}</div>`;
+  }
+
   function renderNotaSpese(container, state) {
     const { calc, settings } = state;
     const ns = calc.notaSpese;
     const ctrl = ns.controlloPastiItalia;
     const mmCities = (settings && settings.italyMmCities) || Defaults.ITALY_MM_CITIES;
     const diffOk = ctrl.differenzaIt >= -0.001;
+    const totalExtras = Calc.formatCurrencyExtras(ns.totaleUnconverted);
+    const bigliettiExtras = Calc.formatCurrencyExtras(ns.bigliettiUnconverted);
+    const speseVarieExtras = Calc.formatCurrencyExtras(ns.speseVarieUnconverted);
+    const infoBannerHtml = totalExtras
+      ? `<div class="info-banner-valuta"><strong>Importi in valuta locale (cambio a cura dell'Ufficio Trasferte):</strong> ${escHtml(totalExtras)}. Non vengono convertiti né sommati nei totali in Euro; su Modulo 1 sono riportati nell'importo reale pagato in valuta.</div>`
+      : '';
 
     container.innerHTML = `
       <div class="nota-grid">
@@ -29,6 +49,7 @@
             <button type="button" id="btn-goto-modulo" class="btn btn-sm btn-primary">Vai al Modulo 1 / Stampa →</button>
           </div>
           <div class="card-body">
+            ${infoBannerHtml}
             <div class="table-wrap">
               <table class="data-table nota-table">
                 <thead>
@@ -51,27 +72,27 @@
                   <tr>
                     <td><strong>COLAZIONI</strong></td>
                     <td class="num" style="text-align:center;">${ns.colazioni.countTot}</td>
-                    <td class="num" style="text-align:right;">${fmt(ns.colazioni.impTot)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.colazioni.impTot, ns.colazioni.unconverted)}</td>
                     <td class="num" style="text-align:center;">${ns.colazioni.countPdl}</td>
-                    <td class="num" style="text-align:right;">${fmt(ns.colazioni.impPdl)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.colazioni.impPdl, ns.colazioni.unconverted)}</td>
                     <td class="num" style="text-align:center;">${ns.colazioni.countForf}</td>
                     <td class="num" style="text-align:right;">${fmt(ns.colazioni.impForf)}</td>
                   </tr>
                   <tr>
                     <td><strong>PASTI</strong></td>
                     <td class="num" style="text-align:center;">${ns.pasti.countTot}</td>
-                    <td class="num" style="text-align:right;">${fmt(ns.pasti.impTot)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.pasti.impTot, ns.pasti.unconverted)}</td>
                     <td class="num" style="text-align:center;">${ns.pasti.countPdl}</td>
-                    <td class="num" style="text-align:right;">${fmt(ns.pasti.impPdl)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.pasti.impPdl, ns.pasti.unconverted)}</td>
                     <td class="num" style="text-align:center;">${ns.pasti.countForf}</td>
                     <td class="num" style="text-align:right;">${fmt(ns.pasti.impForf)}</td>
                   </tr>
                   <tr>
                     <td><strong>PERNOTTAMENTI</strong></td>
                     <td class="num" style="text-align:center;">${ns.pernottamenti.countTot}</td>
-                    <td class="num" style="text-align:right;">${fmt(ns.pernottamenti.impTot)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.pernottamenti.impTot, ns.pernottamenti.unconverted)}</td>
                     <td class="num" style="text-align:center;">${ns.pernottamenti.countPdl}</td>
-                    <td class="num" style="text-align:right;">${fmt(ns.pernottamenti.impPdl)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.pernottamenti.impPdl, ns.pernottamenti.unconverted)}</td>
                     <td class="num" style="text-align:center;">${ns.pernottamenti.countForf}</td>
                     <td class="num" style="text-align:right;">${fmt(ns.pernottamenti.impForf)}</td>
                   </tr>
@@ -96,28 +117,28 @@
                   <tr class="total-row">
                     <td>TOTALI DIARIE</td>
                     <td></td>
-                    <td class="num" style="text-align:right;">${fmt(ns.totaliDiarie.impTot)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.totaliDiarie.impTot, ns.totaliDiarie.unconverted)}</td>
                     <td></td>
-                    <td class="num" style="text-align:right;">${fmt(ns.totaliDiarie.impPdl)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.totaliDiarie.impPdl, ns.totaliDiarie.unconverted)}</td>
                     <td></td>
                     <td class="num" style="text-align:right;">${fmt(ns.totaliDiarie.impForf)}</td>
                   </tr>
                   <tr>
                     <td><strong>SPESE VIAGGIO DOCUMENTATE</strong> <span class="card-subtitle">(Biglietti dip. + Spese varie)</span></td>
                     <td></td>
-                    <td class="num" style="text-align:right;"><strong>${fmt(ns.speseViaggioDoc)}</strong></td>
-                    <td colspan="4" class="card-subtitle">Biglietti: ${fmt(ns.bigliettiDipEur)} · Spese Varie: ${fmt(ns.speseVarieEur)}</td>
+                    <td class="num" style="text-align:right;"><strong>${fmtWithExtras(ns.speseViaggioDoc, ns.speseViaggioUnconverted)}</strong></td>
+                    <td colspan="4" class="card-subtitle">Biglietti: ${fmt(ns.bigliettiDipEur)}${bigliettiExtras ? ` + ${escHtml(bigliettiExtras)}` : ''} · Spese Varie: ${fmt(ns.speseVarieEur)}${speseVarieExtras ? ` + ${escHtml(speseVarieExtras)}` : ''}</td>
                   </tr>
                   <tr>
                     <td><strong>ALTRE SPESE</strong> <span class="card-subtitle">(Commissioni cambi valuta)</span></td>
                     <td></td>
-                    <td class="num" style="text-align:right;"><strong>${fmt(ns.altreSpese)}</strong></td>
+                    <td class="num" style="text-align:right;"><strong>${fmtWithExtras(ns.altreSpese, ns.altreSpeseUnconverted)}</strong></td>
                     <td colspan="4"></td>
                   </tr>
                   <tr class="grand-total">
                     <td>TOTALE TRASFERTA</td>
                     <td></td>
-                    <td class="num" style="text-align:right;">${fmt(ns.totaleTrasferta)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.totaleTrasferta, ns.totaleUnconverted)}</td>
                     <td colspan="4"></td>
                   </tr>
                   <tr>
@@ -135,7 +156,7 @@
                   <tr class="net-row">
                     <td>RESIDUO NETTO A PAGARE</td>
                     <td></td>
-                    <td class="num" style="text-align:right;">${fmt(ns.residuoNetto)}</td>
+                    <td class="num" style="text-align:right;">${fmtWithExtras(ns.residuoNetto, ns.totaleUnconverted)}</td>
                     <td colspan="4"></td>
                   </tr>
                 </tbody>
