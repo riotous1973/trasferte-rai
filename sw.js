@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rai-trasferte-v1';
+const CACHE_NAME = 'rai-trasferte-v2';
 
 const APP_ASSETS = [
   './',
