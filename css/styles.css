@@ -530,6 +530,42 @@ html, body {
   font-size: 11px;
 }
 
+.cell-valuta-pending {
+  color: var(--rai-blue);
+  background: var(--rai-blue-soft);
+  border: 1px solid #c6d6f2;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.kpi-sub-valuta {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rai-blue);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.nota-sub-valuta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rai-blue);
+  margin-top: 2px;
+}
+
+.info-banner-valuta {
+  background: var(--rai-blue-soft);
+  color: var(--rai-blue);
+  border: 1px solid #c6d6f2;
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+
 /* Group headers for Diarie table */
 .grp-date { background: #eef2f7 !important; }
 .grp-pranzo { background: #e8f1fc !important; color: #12408a !important; border-top: 3px solid #2b6cb0; }
